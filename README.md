@@ -1,8 +1,8 @@
 # @pipeworx/companies-house
 
-UK Companies House MCP — statutory company registry, BYO key.
+UK Companies House MCP — statutory company registry.
 
-Part of [Pipeworx](https://pipeworx.io) — an MCP gateway connecting AI agents to 1683+ live data sources.
+Part of [Pipeworx](https://pipeworx.io) — an MCP gateway connecting AI agents to 1831+ live data sources. This is an independent, unofficial integration — not affiliated with, endorsed by, or published by the upstream provider.
 
 ## Tools
 
@@ -11,14 +11,28 @@ Part of [Pipeworx](https://pipeworx.io) — an MCP gateway connecting AI agents 
 - `get_officers(company_number, items_per_page?, start_index?, register_type?)`
 - `get_filings(company_number, category?, items_per_page?, start_index?)`
 - `get_persons_with_significant_control(company_number, items_per_page?, start_index?)`
+- `get_charges(company_number, items_per_page?, start_index?)` — the charges
+  register: secured lending (mortgages, debentures, fixed/floating charges)
+  registered against the company, the UK analogue of a US UCC lien filing.
+  Returns each charge's status (outstanding/satisfied/part-satisfied),
+  created/delivered/satisfied dates, particulars, and persons entitled (the
+  lender(s)).
+
+`company_number` on every per-company tool also accepts a company NAME,
+resolved to a number automatically.
 
 ## Auth
 
-BYO key. Pass `?_apiKey=<key>` on the gateway URL. Register a free key at https://developer.company-information.service.gov.uk.
+Platform-keyed — the gateway supplies the key, same credential and publisher
+as every other tool in this pack. A caller may still pass their own key with
+`?_apiKey=<key>` (register a free one at
+https://developer.company-information.service.gov.uk).
 
 ## Data source
 
-`https://api.company-information.service.gov.uk` — HTTP Basic auth (key as username, empty password).
+Companies House (UK), the statutory company register — company profiles,
+officers, filing history, persons with significant control, and the charges
+(secured lending) register.
 
 ## Quick Start
 
@@ -64,7 +78,7 @@ directly, instead of just this one's:
 }
 ```
 
-Both URLs reach the same gateway and the same 1683+ data sources. The
+Both URLs reach the same gateway and the same 1831+ data sources. The
 only difference is which pack's tools are listed **directly**; `ask_pipeworx`
 reaches all of them from either one.
 

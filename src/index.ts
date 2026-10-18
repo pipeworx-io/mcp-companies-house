@@ -686,6 +686,10 @@ function collapse(s: string): string {
  * - get_officers:     directors and secretaries, current and resigned
  * - get_filings:      filing history (annual returns, accounts, charges, etc.)
  * - get_persons_with_significant_control: PSC records (beneficial owners)
+ * - get_charges:      charges register (secured lending/mortgages registered
+ *                      against the company — the UK analogue of a US UCC
+ *                      lien filing): status, dates, amount/particulars and
+ *                      the persons entitled (the lender(s))
  */
 
 
@@ -774,6 +778,20 @@ const tools: McpToolExport['tools'] = [
       required: ['company_number'],
     },
   },
+  {
+    name: 'get_charges',
+    description:
+      'Retrieve the charges register for a UK company by company_number (from search_companies) OR company NAME \u2014 secured lending (mortgages, debentures, fixed/floating charges) registered against the company, the UK analogue of a US UCC lien filing. Returns each charge\'s charge_number, classification/description, status (outstanding | satisfied | part-satisfied | fully-satisfied), created_on/delivered_on/satisfied_on dates, particulars (fixed/floating/negative-pledge flags and amount secured where stated), and persons_entitled (the lender(s) secured by the charge). A company with no secured lending on file returns zero charges, which reads differently from a company_number that does not exist \u2014 this call disambiguates between the two the same way get_filings does. Counts (total/outstanding/satisfied/part-satisfied) are returned ahead of the charge list.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        company_number: { type: 'string', description: 'UK company number (e.g. "07098618") OR the company NAME (e.g. "Ocado Group") \u2014 a name is resolved here automatically and the match is echoed back as resolved_from_name. Pass whichever you have; do not guess a number from memory, since a plausible wrong one returns a clean empty result that reads as "no charges" for a company that may not exist.' },
+        items_per_page: { type: 'number', description: '1-100 (default 25)' },
+        start_index: { type: 'number', description: 'Pagination offset (default 0)' },
+      },
+      required: ['company_number'],
+    },
+  },
 ];
 
 async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -794,6 +812,8 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
       return getFilings(apiKey, { ...args, company_number: reqStr(args, 'company_number', '"01777777"') });
     case 'get_persons_with_significant_control':
       return getPSC(apiKey, { ...args, company_number: reqStr(args, 'company_number', '"01777777"') });
+    case 'get_charges':
+      return getCharges(apiKey, { ...args, company_number: reqStr(args, 'company_number', '"01777777"') });
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -1134,6 +1154,73 @@ async function getPSC(apiKey: string, args: Record<string, unknown>) {
       ceased_on: p.ceased_on ?? null,
       address: p.address ?? null,
       identification: p.identification ?? null,
+    })),
+  };
+}
+
+async function getCharges(apiKey: string, args: Record<string, unknown>) {
+  const raw = args.company_number as string;
+  if (!raw) throw new Error('company_number is required');
+  const { number: cn, resolved } = await resolveCompany(apiKey, raw);
+  const params = new URLSearchParams({
+    items_per_page: String(Math.min(100, Math.max(1, (args.items_per_page as number) ?? 25))),
+    start_index: String((args.start_index as number) ?? 0),
+  });
+
+  const data = await chFetch<{
+    total_count?: number;
+    unfiltered_count?: number;
+    satisfied_count?: number;
+    part_satisfied_count?: number;
+    items?: {
+      charge_number?: number;
+      status?: string;
+      classification?: { type?: string; description?: string };
+      created_on?: string;
+      delivered_on?: string;
+      satisfied_on?: string;
+      particulars?: {
+        type?: string;
+        description?: string;
+        contains_fixed_charge?: boolean;
+        contains_floating_charge?: boolean;
+        floating_charge_covers_all?: boolean;
+        contains_negative_pledge?: boolean;
+      };
+      secured_details?: { type?: string; description?: string };
+      persons_entitled?: { name?: string }[];
+      transactions?: { filing_type?: string; delivered_on?: string }[];
+      links?: { self?: string };
+    }[];
+  }>(apiKey, `/company/${encodeURIComponent(cn)}/charges`, params);
+
+  const total = data.total_count ?? 0;
+  // Same ambiguity as get_filings/get_persons_with_significant_control: this
+  // endpoint also answers HTTP 200 with an empty item list for a company
+  // number that does not exist, so "zero charges" and "no such company" look
+  // identical until disambiguated. Most companies genuinely have none on
+  // file (no secured lending), which is exactly why that case must not also
+  // be what a nonexistent company returns.
+  if (total === 0 && !(data.items ?? []).length) await assertCompanyExists(apiKey, cn);
+
+  return {
+    company_number: cn,
+    ...(resolved ? { resolved_from_name: resolved } : {}),
+    total,
+    outstanding: total - (data.satisfied_count ?? 0) - (data.part_satisfied_count ?? 0),
+    satisfied: data.satisfied_count ?? null,
+    part_satisfied: data.part_satisfied_count ?? null,
+    charges: (data.items ?? []).map((c) => ({
+      charge_number: c.charge_number ?? null,
+      status: c.status ?? null,
+      classification: c.classification?.description ?? c.classification?.type ?? null,
+      created_on: c.created_on ?? null,
+      delivered_on: c.delivered_on ?? null,
+      satisfied_on: c.satisfied_on ?? null,
+      particulars: c.particulars ?? null,
+      secured_details: c.secured_details ?? null,
+      persons_entitled: (c.persons_entitled ?? []).map((p) => p.name ?? null),
+      transaction_count: c.transactions?.length ?? 0,
     })),
   };
 }
