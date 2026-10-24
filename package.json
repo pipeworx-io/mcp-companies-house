@@ -1,6 +1,6 @@
 {
   "name": "@pipeworx/mcp-companies-house",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Companies House MCP — UK statutory company registry (BYO key)",
   "type": "module",
   "main": "src/index.ts",
@@ -26,7 +26,7 @@
     "@cloudflare/workers-types": "^4.20260405.1"
   },
   "pipeworx": {
-    "sourceHash": "v1-f9f185f30e6bc61a83b5751f51245c3187da19e5a2491db31897e1ea171c5813",
-    "sourceCommit": "b0a4b8e2f3f5b3a4c3f9f2c9a73f91b20d32ce11"
+    "sourceHash": "v1-dda1e3e52cb88eb12681746f56cfdc8158b32a38b820db62eb2c3cf2c8aa8aae",
+    "sourceCommit": "f1ef7a2f6b9cb1b8da1374ec2fcb28c661582b35"
   }
 }
